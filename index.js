@@ -9,6 +9,8 @@ const r = new snoowrap({
 });
 
 const failedCommentIds = new Set();
+const failedPMUsers = new Set();
+
 
 const PUBLIC_REPLY = 'Verifie dans tes messages privés';
 
@@ -64,23 +66,30 @@ async function replyComment(comment, text) {
 }
 
 async function sendPrivateMessage(user, subject, text) {
+    if (failedPMUsers.has(user)) {
+        console.log(`⛔ MP ignoré pour ${user} (échec précédent)`);
+        return;
+    }
+
     try {
         await r.composeMessage({
             to: user,
             subject,
             text
         });
-        console.log(`MP envoyé à ${user}`);
-        await delay(65000); // Délai entre les MP
+        console.log(`📩 MP envoyé à ${user}`);
+        await delay(65000);
     } catch (err) {
         if (err.message.includes('ratelimit')) {
             console.error('⏸️ Ratelimit détecté (MP). Pause de 5 minutes.');
             cooldownUntil = Date.now() + 5 * 60 * 1000;
         } else {
-            console.error(`Erreur lors de l'envoi du MP : ${err}`);
+            console.error(`❌ Erreur MP vers ${user} : ${err}`);
+            failedPMUsers.add(user); // 🔴 Ne plus réessayer cet utilisateur
         }
     }
 }
+
 
 async function processPostComments() {
     const myUsername = (await r.getMe()).name;
