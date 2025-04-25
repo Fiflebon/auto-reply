@@ -118,11 +118,15 @@ async function processPostComments() {
         }
     }
 }
+
 async function processInboxMessages() {
     const messages = await r.getInbox({ filter: 'messages', limit: 50 });
 
     for (const msg of messages) {
-        // 🔸 Filtre les messages envoyés avant le démarrage du bot
+        // 🔸 Filtre : uniquement les messages non lus
+        if (!msg.new) continue;
+
+        // 🔸 Ignore les messages envoyés avant le lancement du bot
         const messageDate = new Date(msg.created_utc * 1000);
         if (messageDate < dateActu) continue;
 
@@ -130,13 +134,25 @@ async function processInboxMessages() {
             msg.body &&
             msg.body.toLowerCase().includes('done') &&
             !msg.was_comment &&
-            !msg.replies // Vérifie que tu n’as pas déjà répondu
+            !msg.replies // Pas déjà répondu
         ) {
-            console.log(`📥 Message "done" reçu de ${msg.author.name}`);
-            await sendPrivateMessage(msg.author.name, 'Merci !', doneReplyPM);
+            console.log(`📥 Message "done" non lu reçu de ${msg.author.name}`);
+
+            try {
+                await msg.reply(doneReplyPM); // ✅ Répond directement au message
+                console.log(`📨 Réponse directe envoyée à ${msg.author.name}`);
+                await delay(65000); // respect du rate limit
+            } catch (err) {
+                console.error(`❌ Erreur lors de la réponse à ${msg.author.name} : ${err}`);
+                failedPMUsers.add(msg.author.name);
+            }
+
+            // ✅ Marque le message comme lu
+            await msg.markAsRead();
         }
     }
 }
+
 
 async function mainLoop() {
     console.log('🔄 Exécution de la boucle principale...');
@@ -168,7 +184,7 @@ let dateActu = new Date();
 
 async function startBot() {
     if (intervalId) return;
-    intervalId = setInterval(mainLoop, 30000);
+    intervalId = setInterval(mainLoop, 60000);
     dateActu = new Date();
 }
 
