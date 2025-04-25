@@ -1,0 +1,154 @@
+const snoowrap = require('snoowrap');
+require('dotenv').config()
+
+const r = new snoowrap({
+    userAgent: process.env.USER_AGENT || 'default-user-agent',
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    refreshToken: process.env.REFRESH_TOKEN
+});
+
+const PUBLIC_REPLY = 'Verifie dans tes messages privés';
+
+let privateMessage = `Salut ! Je suis un bot et je voulais juste te dire que j'ai trouvé ton commentaire intéressant ! Si tu veux discuter, n'hésite pas à me répondre ici ou sur mon profil.`;
+let doneReplyPM = `Super ! Merci d'avoir confirmé. Si tu as d'autres questions, n'hésite pas à me répondre.`;
+
+// Fonctions pour mettre à jour les messages
+function setPrivateMessage(newMessage) {
+    privateMessage = newMessage;
+    console.log('✅ Nouveau message privé standard défini.');
+}
+
+function setDoneReplyMessage(newMessage) {
+    doneReplyPM = newMessage;
+    console.log('✅ Nouveau message privé de réponse au "done" défini.');
+}
+
+// Cooldown global en cas de ratelimit
+let cooldownUntil = null;
+
+async function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function hasAlreadyReplied(comment, myUsername) {
+    try {
+        const replies = await comment.expandReplies({ depth: 1 });
+        return replies.replies.some(reply =>
+            reply.author && reply.author.name.toLowerCase() === myUsername.toLowerCase()
+        );
+    } catch (err) {
+        console.error(`Erreur dans hasAlreadyReplied: ${err}`);
+        return false;
+    }
+}
+
+async function replyComment(comment, text) {
+    try {
+        await comment.reply(text);
+        console.log(`Réponse publique envoyée à ${comment.author.name}`);
+        await delay(12000); // Délai entre chaque commentaire pour respecter le ratelimit
+    } catch (err) {
+        if (err.message.includes('ratelimit')) {
+            console.error('⏸️ Ratelimit détecté. Pause de 5 minutes.');
+            cooldownUntil = Date.now() + 5 * 60 * 1000;
+        } else {
+            console.error(`Erreur lors de la réponse publique : ${err}`);
+        }
+    }
+}
+
+async function sendPrivateMessage(user, subject, text) {
+    try {
+        await r.composeMessage({
+            to: user,
+            subject,
+            text
+        });
+        console.log(`MP envoyé à ${user}`);
+        await delay(65000); // Délai entre les MP
+    } catch (err) {
+        if (err.message.includes('ratelimit')) {
+            console.error('⏸️ Ratelimit détecté (MP). Pause de 5 minutes.');
+            cooldownUntil = Date.now() + 5 * 60 * 1000;
+        } else {
+            console.error(`Erreur lors de l'envoi du MP : ${err}`);
+        }
+    }
+}
+
+async function processPostComments() {
+    const myUsername = (await r.getMe()).name;
+    const myPosts = await r.getMe().getSubmissions({ limit: 100 });
+
+    for (const post of myPosts) {
+        const comments = await post.expandReplies({ depth: 1, limit: 100 });
+
+        for (const comment of comments.comments) {
+            if (!comment || await hasAlreadyReplied(comment, myUsername)) continue;
+
+            console.log(`📬 Nouveau commentaire trouvé : ${comment.body}`);
+            await replyComment(comment, PUBLIC_REPLY);
+            await sendPrivateMessage(comment.author.name, 'Un petit message pour toi', privateMessage);
+        }
+    }
+}
+
+async function processInboxMessages() {
+    const messages = await r.getInbox({ filter: 'messages', limit: 50 });
+
+    for (const msg of messages) {
+        if (
+            msg.body &&
+            msg.body.toLowerCase().includes('done') &&
+            !msg.was_comment &&
+            !msg.replies // Vérifie que tu n’as pas déjà répondu
+        ) {
+            console.log(`📥 Message "done" reçu de ${msg.author.name}`);
+            await sendPrivateMessage(msg.author.name, 'Merci !', doneReplyPM);
+        }
+    }
+}
+
+async function mainLoop() {
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+        console.log('⏳ En pause à cause du ratelimit...');
+        return;
+    }
+
+    try {
+        await processPostComments();
+        await processInboxMessages();
+    } catch (err) {
+        console.error(`Erreur dans mainLoop : ${err}`);
+    }
+}
+
+function setPrivateMessage(msg) {
+    privateMessage = msg;
+}
+
+function setDoneReplyMessage(msg) {
+    doneReplyPM = msg;
+}
+
+let intervalId = null;
+
+async function startBot() {
+    if (intervalId) return;
+    intervalId = setInterval(mainLoop, 30000);
+}
+
+async function stopBot() {
+    if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+    }
+}
+
+module.exports = {
+    startBot,
+    stopBot,
+    setPrivateMessage,
+    setDoneReplyMessage
+};
