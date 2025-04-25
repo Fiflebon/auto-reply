@@ -113,6 +113,10 @@ async function processInboxMessages() {
     const messages = await r.getInbox({ filter: 'messages', limit: 50 });
 
     for (const msg of messages) {
+        // 🔸 Filtre les messages envoyés avant le démarrage du bot
+        const messageDate = new Date(msg.created_utc * 1000);
+        if (messageDate < dateActu) continue;
+
         if (
             msg.body &&
             msg.body.toLowerCase().includes('done') &&

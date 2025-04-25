@@ -15,8 +15,10 @@ app.post('/start', async (req, res) => {
         await startBot();
         isBotRunning = true;
         res.send('🤖 Bot démarré');
+        console.log('Bot démarré');
     } else {
         res.send('🔄 Bot déjà en cours');
+        console.log('Bot déjà en cours');
     }
 });
 
@@ -26,8 +28,10 @@ app.post('/stop', async (req, res) => {
         await stopBot();
         isBotRunning = false;
         res.send('🛑 Bot arrêté');
+        console.log('Bot arrêté');
     } else {
         res.send('⛔ Bot déjà à l’arrêt');
+        console.log('Bot déjà à l’arrêt');
     }
 });
 
