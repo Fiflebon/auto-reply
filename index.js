@@ -12,7 +12,7 @@ const failedCommentIds = new Set();
 const failedPMUsers = new Set();
 
 
-const PUBLIC_REPLY = 'Verifie dans tes messages privés';
+const PUBLIC_REPLY = 'Check your private messages for the reward. Not the chat, but (Notifications: Messages)';
 
 let privateMessage = `Salut ! Je suis un bot et je voulais juste te dire que j'ai trouvé ton commentaire intéressant ! Si tu veux discuter, n'hésite pas à me répondre ici ou sur mon profil.`;
 let doneReplyPM = `Super ! Merci d'avoir confirmé. Si tu as d'autres questions, n'hésite pas à me répondre.`;
@@ -114,7 +114,7 @@ async function processPostComments() {
 
             console.log(`📬 Nouveau commentaire trouvé : ${comment.body}`);
             await replyComment(comment, PUBLIC_REPLY);
-            await sendPrivateMessage(comment.author.name, 'Un petit message pour toi', privateMessage);
+            await sendPrivateMessage(comment.author.name, 'A little message for you (for the video)', privateMessage);
         }
     }
 }
