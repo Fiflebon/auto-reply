@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { startBot, stopBot, setPrivateMessage, setDoneReplyMessage } = require('./index');
+const { startBot, stopBot, setPrivateMessage, setDoneReplyMessage, setCommentaireMessage } = require('./index');
 
 const app = express();
 const PORT = 3000;
@@ -50,6 +50,16 @@ app.post('/set-done-message', (req, res) => {
     setDoneReplyMessage(message);
     res.send('✅ Message "done" mis à jour');
 });
+
+
+// Modifier premier message en commentaire
+app.post('/set-first-commentaire', (req, res) => {
+    const { message } = req.body;
+    if (!message) return res.status(400).send('❌ Message requis');
+    setCommentaireMessage(message);
+    res.send('✅ Message commentaire mis à jour');
+});
+
 
 app.listen(PORT, () => {
     console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
